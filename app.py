@@ -16,6 +16,7 @@ emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surpri
 
 emotion_data = []
 
+
 @app.route('/detect_emotion', methods=['POST'])
 def detect_emotion():
     global emotion_data
@@ -32,6 +33,8 @@ def detect_emotion():
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_classifier.detectMultiScale(gray)
 
+    detected_emotions = []
+
     for (x, y, w, h) in faces:
         roi_gray = gray[y:y + h, x:x + w]
         roi_gray = cv2.resize(roi_gray, (48, 48), interpolation=cv2.INTER_AREA)
@@ -43,21 +46,30 @@ def detect_emotion():
 
             prediction = classifier.predict(roi)[0]
             label = emotion_labels[prediction.argmax()]
-            emotion_data.append(label)
+            detected_emotions.append(label)
 
             # Draw rectangle around the face and display label (optional)
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
             cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+
+    if not detected_emotions:
+        return jsonify({'status': 'no faces detected', 'emotion': None}), 400
+
+    most_frequent_emotion = max(set(detected_emotions), key=detected_emotions.count)
+    emotion_data.extend(detected_emotions)
 
     # Store emotions in a text file
     with open('detected_emotions.txt', 'w') as file:
         for emotion in emotion_data:
             file.write(f"{emotion}\n")
 
-    return jsonify({'status': 'emotion detected', 'emotion': label})
+    return jsonify({'status': 'emotion detected', 'emotion': most_frequent_emotion})
+
 
 @app.route('/test', methods=['POST'])
 def test():
     return "HI"
+
+
 if __name__ == '__main__':
-    app.run(debug=False,host='0.0.0.0')
+    app.run(debug=False, host='0.0.0.0')
